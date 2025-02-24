@@ -1,0 +1,332 @@
+# Databricks notebook source
+from pyspark.sql import SparkSession
+
+# COMMAND ----------
+
+df1 = spark.read.format("csv").option("header", "true").load("dbfs:/FileStore/shared_uploads/emarcellez@gmail.com/PoblaciónMigranteMunicipio.csv")
+
+# COMMAND ----------
+
+df1.show()
+
+# COMMAND ----------
+
+from pyspark.sql.functions import col
+
+# Convertir la columna a tipo numérico (por ejemplo, FloatType)
+df1 = df1.withColumn("col_2020", col("col_2020").cast("float"))
+
+
+# COMMAND ----------
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pyspark.sql import functions as F
+
+# 4. Crear un histograma para visualizar la distribución de los datos
+# Convertir a Pandas para poder graficar con seaborn o matplotlib
+df1_pd = df1.toPandas()
+
+# Graficar el histograma
+plt.figure(figsize=(10, 6))
+sns.histplot(df1_pd['col_2020'], bins=10, kde=True, color="skyblue")
+
+# Añadir las líneas para la media, mediana y moda
+plt.axvline(media, color='red', linestyle='dashed', linewidth=2, label=f'Media: {media}')
+plt.axvline(mediana, color='green', linestyle='dashed', linewidth=2, label=f'Mediana: {mediana}')
+plt.axvline(moda, color='orange', linestyle='dashed', linewidth=2, label=f'Moda: {moda}')
+
+# Añadir título y leyenda
+plt.title('Histograma y Medidas de Tendencia Central', fontsize=14)
+plt.legend()
+
+plt.xlabel('Poblacion')
+plt.ylabel('Frecuencia')
+
+plt.tight_layout() 
+
+plt.xticks(rotation=45)
+
+#plt.xticks(range(min(df1_pd['col_2020']), max(df1_pd['col_2020'])+1, 1))  # Personaliza el rango de valores
+
+# Mostrar el gráfico
+plt.show()
+
+
+
+# COMMAND ----------
+
+plt.tight_layout() 
+
+# COMMAND ----------
+
+plt.show()
+
+# COMMAND ----------
+
+# Calcular los cuantiles
+# Cuantiles que quieres calcular: 25%, 50% y 75% (Q1, Mediana, Q3)
+quantiles = df1.approxQuantile("col_2020", [0.25, 0.5, 0.75], 0.01)
+
+# Mostrar los resultados
+q1, median, q3 = quantiles
+print(f"Primer cuartil (Q1): {q1}")
+print(f"Mediana (Q2): {median}")
+print(f"Tercer cuartil (Q3): {q3}")
+
+# COMMAND ----------
+
+df1.describe().show()
+
+
+# COMMAND ----------
+
+df_q3 = df1.filter(F.col("col_2020") >= q3)
+
+# COMMAND ----------
+
+df_q3.show()
+
+# COMMAND ----------
+
+# Convertir el DataFrame de PySpark a pandas
+df_q3_pandas = df_q3.toPandas()
+
+# Mostrar el DataFrame en pandas
+print(df_q3_pandas)
+
+# COMMAND ----------
+
+# Ordenar los valores de la columna "valor" en orden descendente
+df_top_20 = df1.orderBy(F.col("col_2020").desc()).limit(20)
+
+# Convertir el DataFrame filtrado a pandas
+df_top_20_pandas = df_top_20.toPandas()
+
+# Mostrar los 20 valores más altos en pandas
+print(df_top_20_pandas)
+
+
+# COMMAND ----------
+
+import pandas as pd
+
+# Ajustar pandas para mostrar todas las filas y columnas
+pd.set_option('display.max_rows', None)  # Mostrar todas las filas
+pd.set_option('display.max_columns', None)  # Mostrar todas las columnas
+
+# Mostrar el DataFrame completo
+print(df_top_20_pandas)
+
+
+# COMMAND ----------
+
+# Suponiendo que df_top_20_pandas tiene las columnas 'valor' y 'id'
+df_selected_columns = df_top_20_pandas[['desc_entidad', 'desc_municipio', 'col_2020' ]]
+# Seleccionamos las columnas 'valor' y 'id'
+
+# Mostrar las columnas seleccionadas
+print(df_selected_columns)
+
+
+# COMMAND ----------
+
+df2 = spark.read.format("csv").option("header", "true").load("dbfs:/FileStore/shared_uploads/emarcellez@gmail.com/CausaMigrMunicipio_Poblacion.csv")
+
+# COMMAND ----------
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
+
+# Crear sesión Spark
+spark = SparkSession.builder.appName("Medidas de tendencia central y cuantiles").getOrCreate()
+
+# Calcular la mediana usando approxQuantile
+median = df1.approxQuantile("Col_2020", [0.5], 0.01)[0]
+
+# Calcular los cuantiles
+q1, q2, q3 = df.approxQuantile("valor", [0.25, 0.5, 0.75], 0.01)
+
+# Mostrar los resultados
+print(f"Media: {media}")
+print(f"Mediana: {median}")
+print(f"Q1: {q1}")
+print(f"Mediana (Q2): {q2}")
+print(f"Q3: {q3}")
+
+
+# COMMAND ----------
+
+suma_columna1 = df1.select(sum_('C_educativa')).collect()[0][0]
+
+# Mostrar el resultado
+print(f"Suma de los valores en 'C_educativa': {suma_columna1}")
+
+# COMMAND ----------
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import sum as sum_
+# Crear sesión Spark
+spark = SparkSession.builder.appName("SumarValoresVariasColumnas").getOrCreate()
+# Sumar los valores de las 5 columnas
+suma_columnas = df2.select(
+    sum_('C_educativa').alias('educacion'),
+    sum_(' C_familiar').alias('familiar'),
+    sum_('C_Inseguridad delictiva o violencia').alias('violencia'),
+    sum_('C_trabajo').alias('trabajo'),
+    sum_('C_Otra causa').alias('otra')
+)
+suma_columnas.show()
+
+# Para obtener la suma total de los resultados de las columnas:
+total_suma = suma_columnas.select(
+    sum_('educacion') + sum_('familiar') + sum_('violencia') + sum_('trabajo') + sum_('otra')
+)
+# Mostrar el total de la suma
+total_suma.show()
+
+
+# COMMAND ----------
+
+
+# Calcular el porcentaje de participación de cada columna respecto al total
+porcentajes = suma_columnas.select(
+    (sum_('educacion') / total_suma * 100).alias('porcentaje'),
+    (sum_('familiar') / total_suma * 100).alias('porcentaje_columna2'),
+    (sum_('violencia') / total_suma * 100).alias('porcentaje_columna3'),
+    (sum_('trabajo') / total_suma * 100).alias('porcentaje_columna4'),
+    (sum_('otra') / total_suma * 100).alias('porcentaje_columna5')
+)
+
+# Mostrar los porcentajes
+porcentajes.show()
+
+# COMMAND ----------
+
+import pandas as pd
+
+
+# Sumar los valores de las columnas
+suma_columnas = df2[['C_educativa', ' C_familiar', 'C_Inseguridad delictiva o violencia', 'C_trabajo', 'C_Otra causa']].sum()
+
+
+# Calcular la suma total
+total_suma = suma_columnas.sum()
+
+# Calcular el porcentaje de participación de cada columna respecto al total
+porcentajes = (suma_columnas / total_suma) * 100
+
+# Mostrar los resultados
+print("Suma por columna:")
+print(suma_columnas)
+
+print("\nPorcentaje de participación por columna:")
+print(porcentajes)
+
+
+# COMMAND ----------
+
+# Ordenar el DataFrame por la columna 'Poblacion_Migrante' de forma descendente
+df_sorted = df1.orderBy(col('Col_2020').desc())
+
+# Seleccionar los top 10 municipios con mayor población migrante
+top_10_municipios = df_sorted.limit(10)
+
+# Mostrar el resultado
+top_10_municipios.show()
+
+# COMMAND ----------
+
+df3 = spark.read.format("csv").option("header", "true").load("dbfs:/FileStore/shared_uploads/emarcellez@gmail.com/CausaMigrMunicipio_Poblacion-1.csv")
+
+# COMMAND ----------
+
+
+
+# COMMAND ----------
+
+# Ordenar el DataFrame por la columna 'Poblacion_Migrante' de forma descendente
+df_sorted = df3.orderBy(col(' C_familiar').desc())
+
+# Seleccionar los top 10 municipios con mayor población migrante
+top_10_municipios = df_sorted.limit(10)
+
+# Mostrar el resultado
+top_10_municipios.show()
+
+# COMMAND ----------
+
+# Ordenar el DataFrame por la columna 'Poblacion_Migrante' de forma descendente
+df_sorted = df3.orderBy(col('C_Inseguridad delictiva o violencia').desc())
+
+# Seleccionar los top 10 municipios con mayor población migrante
+top_10_municipios = df_sorted.limit(10)
+
+# Mostrar el resultado
+top_10_municipios.show()
+
+# COMMAND ----------
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
+import pandas as pd
+
+# Crear una sesión de Spark
+spark = SparkSession.builder.appName("Top10MunicipiosMigrantes").getOrCreate()
+# Ordenar el DataFrame por la columna 'Poblacion_Migrante' de forma descendente
+df_sorted = df3.orderBy(col('C_Inseguridad delictiva o violencia').desc())
+# Seleccionar los top 10 municipios con mayor población migrante
+top_10_municipios = df_sorted.limit(10)
+# Convertir el DataFrame de Spark a Pandas
+top_10_municipios_pd = top_10_municipios.toPandas()
+# Seleccionar solo las columnas 'Estado' y 'Poblacion_Migrante' en Pandas
+top_10_municipios_pd = top_10_municipios_pd[['Municipio', 'desc_entidad', 'C_Inseguridad delictiva o violencia']]
+# Mostrar el resultado en Pandas
+print(top_10_municipios_pd)
+
+# COMMAND ----------
+
+df3 = spark.read.format("csv").option("header", "true").load("dbfs:/FileStore/shared_uploads/emarcellez@gmail.com/CausaMigrMunicipio_Poblacion-1.csv")
+
+# COMMAND ----------
+
+# Importar las librerías necesarias
+import matplotlib.pyplot as plt
+
+# Asumiendo que tienes un DataFrame 'df' con dos columnas: 'Municipio' y 'Poblacion'
+# Si ya tienes el DataFrame en Spark, lo convertimos a Pandas para visualización
+df3 = df3.toPandas()
+
+# Crear el gráfico de dispersión donde el eje x son los municipios y el eje y es la población
+plt.scatter(df3['Municipio'], df3['Poblacion'])
+
+# Rotar las etiquetas del eje x para que se vean mejor
+plt.xticks(rotation=45)
+
+# Títulos y etiquetas
+plt.title('Gráfico de dispersión de Municipios vs Población')
+plt.xlabel('Municipio')
+plt.ylabel('Poblacion')
+
+# Mostrar el gráfico
+plt.show()
+
+
+# COMMAND ----------
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
+import pandas as pd
+
+# Crear una sesión de Spark
+spark = SparkSession.builder.appName("Top10MunicipiosMigrantes").getOrCreate()
+# Ordenar el DataFrame por la columna 'Poblacion_Migrante' de forma descendente
+df_sorted = df3.orderBy(col('Poblacion').desc())
+# Seleccionar los top 10 municipios con mayor población migrante
+top_10_municipios = df_sorted.limit(10)
+# Convertir el DataFrame de Spark a Pandas
+top_10_municipios_pd = top_10_municipios.toPandas()
+# Seleccionar solo las columnas 'Estado' y 'Poblacion_Migrante' en Pandas
+top_10_municipios_pd = top_10_municipios_pd[['Municipio', 'desc_entidad', 'Poblacion']]
+# Mostrar el resultado en Pandas
+print(top_10_municipios_pd)
